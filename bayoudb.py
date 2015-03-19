@@ -61,11 +61,12 @@ class EventStream:
     def append(self, data):
         file = self.open()
         file.seek(0, os.SEEK_END)
-        offset = file.tell()
-        data = data.copy()
-        data['_offset'] = str(offset)
-        data['_time'] = "{}Z".format(datetime.datetime.utcnow().isoformat())
-        text = "{}\n".format(simplejson.dumps(data, separators=(',', ':'), sort_keys=True))
+        obj = dict(
+            data=data,
+            offset=str(file.tell()),
+            time="{}Z".format(datetime.datetime.utcnow().isoformat())
+        )
+        text = "{}\n".format(simplejson.dumps(obj, separators=(',', ':'), sort_keys=True))
         file.write(text)
         file.flush()
         self._notify(text, file.tell())
@@ -87,7 +88,10 @@ class EventStream:
 @asyncio.coroutine
 def append_handler(request):
     event_stream = EventStream.cached(request.match_info['stream'])
-    data = yield from request.json(loader=simplejson.loads)
+    try:
+        data = yield from request.json(loader=simplejson.loads)
+    except simplejson.JSONDecodeError:
+        raise web.HTTPBadRequest
     text = event_stream.append(data)
     return web.Response(
         body=text.encode(ENCODING),
