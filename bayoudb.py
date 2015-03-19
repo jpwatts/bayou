@@ -11,6 +11,8 @@ import simplejson
 
 
 ENCODING = "UTF-8"
+OFFSET = 1
+
 ROOT = "/tmp/bayoudb"
 
 
@@ -40,12 +42,16 @@ class EventStream:
 
     @property
     def path(self):
-        return os.path.join(ROOT, self.name)
+        return os.path.join(ROOT, "{0.name}/1.ldjson".format(self))
 
     def open(self):
         file = self._file
         if file is None:
-            file = open(self.path, 'a+')
+            path = self.path
+            root = os.path.split(path)[0]
+            if not os.path.exists(root):
+                os.makedirs(root)
+            file = open(path, 'a+')
             self._file = file
         return file
 
@@ -63,8 +69,9 @@ class EventStream:
         file.seek(0, os.SEEK_END)
         obj = dict(
             data=data,
-            offset=str(file.tell()),
-            time="{}Z".format(datetime.datetime.utcnow().isoformat())
+            id=str(OFFSET + file.tell()),
+            time="{}Z".format(datetime.datetime.utcnow().isoformat()),
+            type="event"
         )
         text = "{}\n".format(simplejson.dumps(obj, separators=(',', ':'), sort_keys=True))
         file.write(text)
@@ -72,11 +79,11 @@ class EventStream:
         self._notify(text, file.tell())
         return text
 
-    def offset(self, since=None):
-        if since is None:
+    def offset(self, since_id=0):
+        if not since_id:
             return 0
         file = self.open()
-        file.seek(since)
+        file.seek(since_id - OFFSET)
         file.readline()
         return file.tell()
 
@@ -118,9 +125,7 @@ def read_handler(request):
     loop = request.app.loop
 
     try:
-        since = int(request.GET['since'])
-    except KeyError:
-        since = None
+        since = int(request.GET.get('since', 0))
     except ValueError:
         raise web.HTTPBadRequest
 
@@ -136,9 +141,6 @@ def read_handler(request):
 
 def main():
     logging.basicConfig(level=logging.DEBUG)
-
-    if not os.path.exists(ROOT):
-        os.makedirs(ROOT)
 
     loop = asyncio.get_event_loop()
 
