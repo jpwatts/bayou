@@ -49,9 +49,9 @@ class EventStream:
             self._file = file
         return file
 
-    def _notify(self, text, next_offset):
+    def _notify(self, text, offset):
         futures = self._futures
-        result = (text, next_offset)
+        result = (text, offset)
         for future in futures:
             if future.done():
                 continue
@@ -71,6 +71,14 @@ class EventStream:
         file.flush()
         self._notify(text, file.tell())
         return text
+
+    def offset(self, since=None):
+        if since is None:
+            return 0
+        file = self.open()
+        file.seek(since)
+        file.readline()
+        return file.tell()
 
     @asyncio.coroutine
     def read(self, offset, loop=None):
@@ -108,9 +116,17 @@ def read_handler(request):
     response.start(request)
 
     loop = request.app.loop
-    next_offset = 0
+
+    try:
+        since = int(request.GET['since'])
+    except KeyError:
+        since = None
+    except ValueError:
+        raise web.HTTPBadRequest
+
+    offset = event_stream.offset(since)
     while True:
-        text, next_offset = yield from event_stream.read(next_offset, loop=loop)
+        text, offset = yield from event_stream.read(offset, loop=loop)
         response.write(text.encode(ENCODING))
         yield from response.drain()
 
