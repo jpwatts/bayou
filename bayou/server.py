@@ -23,15 +23,6 @@ class Stream:
     def __repr__(self):
         return "{0.__name__}({1.root!r})".format(type(self), self)
 
-    def _notify(self, text, next_offset):
-        futures = self._readers
-        result = (text, next_offset)
-        for future in futures:
-            if future.done():
-                continue
-            future.set_result(result)
-        futures.clear()
-
     @asyncio.coroutine
     def open(self, offset, loop=None):
         file = self._file
@@ -57,7 +48,15 @@ class Stream:
         text = "{}\n".format(simplejson.dumps(obj, separators=(',', ':'), sort_keys=True))
         file.write(text)
         file.flush()
-        self._notify(text, file.tell())
+
+        readers = self._readers
+        result = text, file.tell()
+        for reader in readers:
+            if reader.done():
+                continue
+            reader.set_result(result)
+        readers.clear()
+
         return text
 
     @asyncio.coroutine
