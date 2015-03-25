@@ -1,0 +1,13 @@
+language: "python"
+
+python:
+  - "3.4"
+
+env:
+   - "LANG=C.UTF-8 LC_ALL=C.UTF-8"
+
+install:
+  - "pip install nose coverage"
+  - "pip install -e ."
+
+script: "nosetests --verbose --logging-level=DEBUG --with-coverage --cover-package=bayou"
