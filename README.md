@@ -1,3 +1,5 @@
+# Bayou [![Build Status](https://travis-ci.org/jpwatts/bayou.svg?branch=master)](https://travis-ci.org/jpwatts/bayou)
+
 Bayou is an event stream server.
 
 Run the server:
